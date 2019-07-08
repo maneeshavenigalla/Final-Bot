@@ -1,3 +1,4 @@
+// This loads the environment variables from the .env file
 require("dotenv-extended").load();
 
 const builder = require("botbuilder");
@@ -5,17 +6,32 @@ const restify = require("restify");
 const Store = require("./store");
 const spellService = require("./spell-service");
 
+// Setup Restify Server
 const server = restify.createServer();
 server.listen(process.env.port || process.env.PORT || 3978, () => {
   console.log(`${server.name} listening to ${server.url}`);
 });
 
+// Create connector and listen for messages
 const connector = new builder.ChatConnector({
   appId: process.env.MICROSOFT_APP_ID,
   appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
-
 server.post("/api/messages", connector.listen());
+
+// Default store: volatile in-memory store - Only for prototyping!
+var inMemoryStorage = new builder.MemoryBotStorage();
+var bot = new builder.UniversalBot(connector, function(session) {
+  session.send(
+    "Sorry, I did not understand '%s'. Type 'help' if you need assistance.",
+    session.message.text
+  );
+}).set("storage", inMemoryStorage); // Register in memory storage
+
+// You can provide your own model by specifing the 'LUIS_MODEL_URL' environment variable
+// This Url can be obtained by uploading or creating your model from the LUIS portal: https://www.luis.ai/
+const recognizer = new builder.LuisRecognizer(process.env.LUIS_MODEL_URL);
+bot.recognizer(recognizer);
 
 const roomsList = [
   "sea-view",
@@ -27,13 +43,6 @@ const roomsList = [
   "smoking",
   "non-smoking"
 ];
-
-var inMemoryStorage = new builder.MemoryBotStorage();
-
-var bot = new builder.UniversalBot(connector).set("storage", inMemoryStorage);
-
-const recognizer = new builder.LuisRecognizer(process.env.LUIS_MODEL_URL);
-bot.recognizer(recognizer);
 
 bot.on("conversationUpdate", message => {
   if (message.membersAdded) {
@@ -57,10 +66,6 @@ bot.on("conversationUpdate", message => {
                 {
                   type: "TextBlock",
                   text: "Welcome to Constance Bot! Your friendly Bot!"
-                },
-                {
-                  type: "TextBlock",
-                  text: "Please enter your destination"
                 }
               ]
             }
@@ -73,10 +78,20 @@ bot.on("conversationUpdate", message => {
 });
 
 bot
+  .dialog("Greetings", [
+    (session, args, next) => {
+      session.send("Hello there!!\n\n Please enter your destination ");
+    }
+  ])
+  .triggerAction({
+    matches: "Greetings"
+  });
+
+bot
   .dialog("SearchHotels", [
     (session, args, next) => {
       session.send(
-        `Welcome to the Constance! We are analyzing your request: ${
+        `We are analyzing your request: ${
           session.message.text
         }. Please give us a minute!`
       );
@@ -148,11 +163,6 @@ bot
         session.send("Hope you have a nice day!");
       }
     }
-    // (session, args, next) => {
-    //   session.send(
-    //     `Thanks for the reaching out to us!! Your booking is confirmed! A confirmation email has been sent to your email. We hope you have a pleasant stay!!`
-    //   );
-    // }
   ])
   .triggerAction({
     matches: "Rooms",
