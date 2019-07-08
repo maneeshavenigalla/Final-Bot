@@ -14,18 +14,63 @@ const connector = new builder.ChatConnector({
   appId: process.env.MICROSOFT_APP_ID,
   appPassword: process.env.MICROSOFT_APP_PASSWORD
 });
+
 server.post("/api/messages", connector.listen());
 
+const roomsList = [
+  "sea-view",
+  "double",
+  "city-view",
+  "single",
+  "luxury",
+  "deluxe",
+  "smoking",
+  "non-smoking"
+];
+
 var inMemoryStorage = new builder.MemoryBotStorage();
-var bot = new builder.UniversalBot(connector, function(session) {
-  session.send(
-    "Hello!! I`m the Constance Bot! Your friendly Bot! How can I assist you ?",
-    session.message.text
-  );
-}).set("storage", inMemoryStorage);
+
+var bot = new builder.UniversalBot(connector).set("storage", inMemoryStorage);
 
 const recognizer = new builder.LuisRecognizer(process.env.LUIS_MODEL_URL);
 bot.recognizer(recognizer);
+
+bot.on("conversationUpdate", message => {
+  if (message.membersAdded) {
+    message.membersAdded.forEach(function(identity) {
+      if (identity.id === message.address.bot.id) {
+        const welcomeCard = new builder.Message()
+          .address(message.address)
+          .addAttachment({
+            contentType: "application/vnd.microsoft.card.adaptive",
+            content: {
+              type: "AdaptiveCard",
+              speak:
+                "<s>Your  meeting about \"Adaptive Card design session\"<break strength='weak'/> is starting at 12:30pm</s><s>Do you want to snooze <break strength='weak'/> or do you want to send a late notification to the attendees?</s>",
+              body: [
+                {
+                  type: "Image",
+                  size: "large",
+                  url:
+                    "https://www.constancehospitality.com/images/logo_254.png"
+                },
+                {
+                  type: "TextBlock",
+                  text: "Welcome to Constance Bot! Your friendly Bot!"
+                },
+                {
+                  type: "TextBlock",
+                  text: "Please enter your destination"
+                }
+              ]
+            }
+          });
+
+        bot.send(welcomeCard);
+      }
+    });
+  }
+});
 
 bot
   .dialog("SearchHotels", [
@@ -35,23 +80,7 @@ bot
           session.message.text
         }. Please give us a minute!`
       );
-      const cityEntity = builder.EntityRecognizer.findEntity(
-        args.intent.entities,
-        "builtin.geography.city"
-      );
-      const airportEntity = builder.EntityRecognizer.findEntity(
-        args.intent.entities,
-        "AirportCode"
-      );
-      if (cityEntity) {
-        session.dialogData.searchType = "city";
-        next({ response: cityEntity.entity });
-      } else if (airportEntity) {
-        session.dialogData.searchType = "airport";
-        next({ response: airportEntity.entity });
-      } else {
-        builder.Prompts.text(session, "Please enter your destination");
-      }
+      next({ response: session.message.text });
     },
     (session, results) => {
       const destination = results.response;
@@ -81,24 +110,49 @@ bot
 
 bot
   .dialog("Rooms", [
-    (session, args, next) => {
-      session.send(`We are fetching the rooms as per your request.!`);
-      next({ response: args });
-    },
-    (session, results) => {
+    (session, results, next) => {
       const typeOfRoom = results.response;
       let message = "Looking for available rooms";
       session.send(message, typeOfRoom);
       Store.searchRooms(typeOfRoom).then(rooms => {
-        session.send(`I found ${rooms} rooms:`);
-        let availableRooms = new builder.Message().attachmentLayout(
-          builder.AttachmentLayout.carousel
+        session.send(`I found ${rooms.length} available rooms:`);
+        let roomChoice = builder.Prompts.choice(
+          session,
+          "What kind of room do you want?",
+          roomsList
         );
-        //   .attachments(rooms.map(roomAsAttachment));
-        session.send(availableRooms);
-        session.endDialog();
+        session.send(roomChoice);
+        next({ response: args });
       });
+    },
+    (session, args, next) => {
+      var numberOfRooms = builder.Prompts.number(
+        session,
+        "Amazing! How many rooms do you want to book?"
+      );
+      session.send(numberOfRooms);
+      next();
+    },
+    (session, args, next) => {
+      builder.Prompts.confirm(
+        session,
+        "Do you want to confirm your reservation?"
+      );
+    },
+    (session, args) => {
+      if (args.response) {
+        session.send(
+          "`Thanks for the reaching out to us!! Your booking is confirmed! A confirmation email has been sent to your email. We hope you have a pleasant stay!!`"
+        );
+      } else {
+        session.send("Hope you have a nice day!");
+      }
     }
+    // (session, args, next) => {
+    //   session.send(
+    //     `Thanks for the reaching out to us!! Your booking is confirmed! A confirmation email has been sent to your email. We hope you have a pleasant stay!!`
+    //   );
+    // }
   ])
   .triggerAction({
     matches: "Rooms",

@@ -6,10 +6,16 @@
   "culture": "en-us",
   "intents": [
     {
+      "name": "Greetings"
+    },
+    {
       "name": "Help"
     },
     {
       "name": "None"
+    },
+    {
+      "name": "Rooms"
     },
     {
       "name": "SearchHotels"
@@ -21,6 +27,10 @@
   "entities": [
     {
       "name": "Hotel",
+      "roles": []
+    },
+    {
+      "name": "Rooms",
       "roles": []
     }
   ],

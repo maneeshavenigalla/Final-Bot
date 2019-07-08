@@ -46,16 +46,10 @@ const rooms = [
 const searchRooms = typeOfRoom => {
   return new Promise((resolve, reject) => {
     // Filling the hotels results manually just for demo purposes
-    let roomTypes = Array(rooms).fill({});
     rooms.map((rooms, index) => {
       const j = index + 1;
       return {
         name: `${typeOfRoom} Hotel ${j}`
-        // location: destination,
-        // rating: Math.ceil(Math.random() * 5),
-        // numberOfReviews: Math.floor(Math.random() * 5000) + 1,
-        // priceStarting: Math.floor(Math.random() * 450) + 80,
-        // image: `https://www.constancehospitality.com/media/1051/constance-hospitality-management-history-2.jpg`
       };
     });
     // complete promise with a timer to simulate async response
